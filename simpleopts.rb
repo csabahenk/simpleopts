@@ -11,7 +11,7 @@ module SimpleOpts
     [inopts].flatten.each { |oh|
       opts.merge! oh.map { |o,d| [o, {default: d}] }.to_h
     }
-    fixer = proc { |a| { Fixnum => Integer }[a] || a }
+    fixer = proc { |c| (Class === c and c.name == "Fixnum") ? Integer : c }
     OptionParser.new { |op|
        opts.each { |o,w|
          # Mangling opts to OptionParser options in a disgraced manner
