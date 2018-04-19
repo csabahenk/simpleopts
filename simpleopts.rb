@@ -12,6 +12,7 @@ module SimpleOpts
       opts.merge! oh.map { |o,d| [o, {default: d}] }.to_h
     }
     fixer = proc { |c| (Class === c and c.name == "Fixnum") ? Integer : c }
+    shortopts = []
     OptionParser.new { |op|
        opts.each { |o,w|
          # Mangling opts to OptionParser options in a disgraced manner
@@ -21,8 +22,9 @@ module SimpleOpts
          #   accepted by OptionParser
          # - opt_name: <class> becomes: op.on("-o", "--opt-name", <class>) {...}
          defval = w[:default]
+         shortie = "-#{o[0]}"
          optargs = [
-          "-#{o[0]}",
+          shortopts.include?(shortie) ? [] : (shortopts << shortie; [shortie]),
           "--#{o.to_s.gsub "_", "-"}=VAL",
           ((Class === defval ? [] : [defval.class]) << defval).instance_eval {|a|
              [fixer[a[0]], a[1..-1].map(&:to_s)].flatten
