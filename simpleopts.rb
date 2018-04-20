@@ -8,6 +8,8 @@ module SimpleOpts
 
   def self.represent v
     case v
+    when ""
+      '""'
     when String
       w = v.inspect
       [v, w[1...-1], v.strip].uniq.size == 1 ? v : w
@@ -34,7 +36,14 @@ module SimpleOpts
          #   where fixer is needed to map arbitrary classes into the class set
          #   accepted by OptionParser
          defval = w[:default]
-         optclass = fixer[Class === defval ? defval : defval.class]
+         optclass = fixer.call case defval
+         when Class
+           defval
+         when nil
+           String
+         else
+           defval.class
+         end
          # Classes don't match themselves with === operator,
          # so the case construct has to dispatch on their names.
          # Also some of the classes we are to dispatch on may
@@ -67,19 +76,19 @@ module SimpleOpts
       config_file = (opts[config_file_opt]||{}).values_at(
          :cmdline, :default).compact.first
       keep_config_file or opts.delete(config_file_opt)
-      unless config_file.to_s.empty?
+      if config_file
         YAML.load_file(config_file).each { |k,v|
           (opts[k.to_sym]||{})[:conf] = v
         }
       end
     end
     opts.each { |o,w|
-      v = w.values_at(:cmdline, :conf, :default).compact.first
+      k = %i[cmdline conf default].find { |k| w.key? k }
+      v = w[k]
       if Class === v
         puts "missing value for --#{o}"
         exit 1
       end
-      v == "" and v = nil
       opts[o] = v
     }
 
