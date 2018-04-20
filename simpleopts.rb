@@ -6,6 +6,18 @@ require 'optparse'
 
 module SimpleOpts
 
+  def self.represent v
+    case v
+    when String
+      w = v.inspect
+      [v, w[1...-1], v.strip].uniq.size == 1 ? v : w
+    when Regexp
+      v.inspect
+    else
+      v.to_s
+    end
+  end
+
   def self.get inopts, config_file_opt: nil, keep_config_file: false, argv: $*
     opts = {}
     [inopts].flatten.each { |oh|
@@ -18,17 +30,35 @@ module SimpleOpts
          # Mangling opts to OptionParser options in a disgraced manner
          # - opt_name: <scalar> becomes:
          #   op.on("-o", "--opt-name", fixer[<scalar>.class], <scalar>.to_s) {...}
+         # - opt_name: <class> becomes: op.on("-o", "--opt-name", fixer[<class>]) {...}
          #   where fixer is needed to map arbitrary classes into the class set
          #   accepted by OptionParser
-         # - opt_name: <class> becomes: op.on("-o", "--opt-name", <class>) {...}
          defval = w[:default]
+         optclass = fixer[Class === defval ? defval : defval.class]
+         # Classes don't match themselves with === operator,
+         # so the case construct has to dispatch on their names.
+         # Also some of the classes we are to dispatch on may
+         # not be defined (Date*) -- thus dispatching on the name
+         # avoids reference to an undefined.
+         valrep = case optclass.name
+         when 'Integer','Float'
+           "N"
+         when 'TrueClass','FalseClass'
+           "[BOOL]"
+         when 'Array'
+           "VAL,.."
+         when 'Regexp'
+           "PAT"
+         when 'Date','Time','DateTime'
+           "T"
+         else
+           "VAL"
+         end
          shortie = "-#{o[0]}"
          optargs = [
           shortopts.include?(shortie) ? [] : (shortopts << shortie; [shortie]),
-          "--#{o.to_s.gsub "_", "-"}=VAL",
-          ((Class === defval ? [] : [defval.class]) << defval).instance_eval {|a|
-             [fixer[a[0]], a[1..-1].map(&:to_s)].flatten
-          }
+          "--#{o.to_s.gsub "_", "-"}=#{valrep}",
+          [optclass] + (Class === defval ? [] : [represent(defval)])
          ].flatten
          op.on(*optargs) { |v| opts[o][:cmdline] = v }
        }
