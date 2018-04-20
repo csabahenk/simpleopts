@@ -20,7 +20,8 @@ module SimpleOpts
     end
   end
 
-  def self.get inopts, config_file_opt: nil, keep_config_file: false, argv: $*
+  def self.get inopts, config_file_opt: nil, keep_config_file: false, argv: $*,
+      missing_cbk: nil
     opts = {}
     [inopts].flatten.each { |oh|
       opts.merge! oh.map { |o,d| [o, {default: d}] }.to_h
@@ -86,8 +87,12 @@ module SimpleOpts
       k = %i[cmdline conf default].find { |k| w.key? k }
       v = w[k]
       if Class === v
-        puts "missing value for --#{o}"
-        exit 1
+        if missing_cbk
+          missing_cbk[o]
+        else
+          puts "missing value for --#{o}"
+          exit 1
+        end
       end
       opts[o] = v
     }
