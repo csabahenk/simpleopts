@@ -93,7 +93,7 @@ module SimpleOpts
   end
 
   def get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
-      optclass: Opt
+      optclass: Opt, help_args: nil
     opts = {}
     [inopts].flatten.each { |oh|
       opts.merge! oh.map { |o,d|
@@ -112,6 +112,7 @@ module SimpleOpts
     }
     shortopts = []
     OptionParser.new { |op|
+      help_args and op.banner << " " << help_args
       opts.each { |o,w|
         # Mangling opts to OptionParser options in a graceful manner
         # - opt_name: <scalar> becomes:
