@@ -2,6 +2,7 @@ require 'optparse'
 
 
 module SimpleOpts
+  extend self
 
   class Opt
 
@@ -25,16 +26,22 @@ module SimpleOpts
       end
     end
 
+    private def setup
+      @type = self.class.classfixer(@type ||
+                (@default == :auto ? String : @default.class))
+      @default_rep ||= self.class.represent(default)
+    end
+
     def initialize name: nil, type: nil, default: :auto, default_rep: nil,
                    short: :auto, argument: :auto, info: "%{default}"
       @name = name
       @default = default
-      @type = self.class.classfixer(type ||
-                (@default == :auto ? String : @default.class))
-      @default_rep = default_rep || self.class.represent(self.default)
+      @default_rep = default_rep
+      @type = type
       @info = info
       @short = short
       @argument = argument
+      setup
     end
 
     attr_accessor :name, :type, :info, :default_rep
@@ -85,8 +92,8 @@ module SimpleOpts
 
   end
 
-  def self.get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
-      conf_load_cbk: nil, optclass: Opt, missing_cbk: nil
+  def get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
+      optclass: Opt
     opts = {}
     [inopts].flatten.each { |oh|
       opts.merge! oh.map { |o,d|
@@ -137,8 +144,7 @@ module SimpleOpts
          :cmdline, :default).compact.first
       conf_load_opt or opts.delete(conf_opt)
       if conf_resource
-        (conf_load_cbk ||
-         YAML.method(:load_file)).call(conf_resource).each { |k,v|
+         conf_load(conf_resource).each { |k,v|
           (opts[k.to_sym]||{})[:conf] = v
         }
       end
@@ -146,19 +152,20 @@ module SimpleOpts
     opts.each { |o,w|
       k = %i[cmdline conf default].find { |k| w.key? k }
       v = w[k]
-      if Class === v
-        optname = w[:opt].name
-        if missing_cbk
-          missing_cbk[optname]
-        else
-          puts "missing value for --#{optname}"
-          exit 1
-        end
-      end
+      Class === v and missing(w[:opt].name)
       opts[o] = v
     }
 
     opts
+  end
+
+  def missing optname
+    puts "missing value for --#{optname}"
+    exit 1
+  end
+
+  def conf_load resource
+    YAML.load_file resource
   end
 
 end
