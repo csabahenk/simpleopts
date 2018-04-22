@@ -85,8 +85,8 @@ module SimpleOpts
 
   end
 
-  def self.get inopts, config_file_opt: nil, keep_config_file: false, argv: $*,
-      optclass: Opt, missing_cbk: nil
+  def self.get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
+      conf_load_cbk: nil, optclass: Opt, missing_cbk: nil
     opts = {}
     [inopts].flatten.each { |oh|
       opts.merge! oh.map { |o,d|
@@ -132,12 +132,13 @@ module SimpleOpts
         op.on(*optargs) { |v| opts[o][:cmdline] = v }
       }
     }.parse! argv
-    if config_file_opt
-      config_file = (opts[config_file_opt]||{}).values_at(
+    if conf_opt
+      conf_resource = (opts[conf_opt]||{}).values_at(
          :cmdline, :default).compact.first
-      keep_config_file or opts.delete(config_file_opt)
-      if config_file
-        YAML.load_file(config_file).each { |k,v|
+      conf_load_opt or opts.delete(conf_opt)
+      if conf_resource
+        (conf_load_cbk ||
+         YAML.method(:load_file)).call(conf_resource).each { |k,v|
           (opts[k.to_sym]||{})[:conf] = v
         }
       end
