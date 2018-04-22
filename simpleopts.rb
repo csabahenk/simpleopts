@@ -20,7 +20,7 @@ module SimpleOpts
       when Regexp
         v.inspect
       when Class
-        ""
+        "(required)"
       else
         v.to_s
       end
