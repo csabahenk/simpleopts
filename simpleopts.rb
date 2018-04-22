@@ -1,8 +1,7 @@
 require 'optparse'
 
 
-module SimpleOpts
-  extend self
+class SimpleOpts
 
   class Opt
 
@@ -92,72 +91,96 @@ module SimpleOpts
 
   end
 
-  def get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
-      optclass: Opt, help_args: nil
-    opts = {}
-    [inopts].flatten.each { |oh|
-      opts.merge! oh.map { |o,d|
-        optname = o.to_s.gsub "_", "-"
-        opt = case d
-        when Opt,optclass
-          d.name ||= optname
-          d
-        when Class
-          optclass.new name: optname, type: d
-        else
-          optclass.new name: optname, default: d
-        end
-        [o, {opt: opt, default: opt.default}]
-      }.to_h
-    }
-    shortopts = []
-    OptionParser.new { |op|
-      help_args and op.banner << " " << help_args
-      opts.each { |o,w|
-        # Mangling opts to OptionParser options in a graceful manner
-        # - opt_name: <scalar> becomes:
-        #   op.on("-o", "--opt-name", fixer[<scalar>.class], <scalar>.to_s) {...}
-        # - opt_name: <class> becomes: op.on("-o", "--opt-name", fixer[<class>]) {...}
-        #   where fixer is needed to map arbitrary classes into the class set
-        #   accepted by OptionParser
-        # This is actually the special case of the following general mechanism
-        # (through making an Opt instance <opt> from given <scalar>/<class>):
-        # - opt_name: <opt> becomes:
-        #   op.on("-"+<opt>.short, "--" + <opt>.name, <opt>.type,
-        #         <opt>.info % <opt>.default) {...}
-        opt = w[:opt]
-        if shortopts.include? opt.short
-          opt.short_set? or opt.short = nil
-        else
-          shortopts << opt.short
-        end
-        optargs = [
-          opt.short ? "-" + opt.short : nil,
-          ["--" + opt.name, opt.argument].compact.join("="),
-          opt.type,
-          opt.info % {default: opt.default_rep}
-        ].compact
-        op.on(*optargs) { |v| opts[o][:cmdline] = v }
-      }
-    }.parse! argv
-    if conf_opt
-      conf_resource = (opts[conf_opt]||{}).values_at(
-         :cmdline, :default).compact.first
-      conf_load_opt or opts.delete(conf_opt)
-      if conf_resource
-         conf_load(conf_resource).each { |k,v|
-          (opts[k.to_sym]||{})[:conf] = v
-        }
+  attr_reader :optionparser
+  alias op optionparser
+
+  def initialize optionparser: nil, help_args: nil
+    @optionparser = optionparser || OptionParser.new
+    help_args and op.banner << " " << help_args
+    @opts = {}
+    @shortopts = []
+  end
+
+  def add_opts inopts, optclass: Opt
+    opts = inopts.map do |o,d|
+      optname = o.to_s.gsub "_", "-"
+      opt = case d
+      when Opt,optclass
+        d.name ||= optname
+        d
+      when Class
+        optclass.new name: optname, type: d
+      else
+        optclass.new name: optname, default: d
       end
-    end
+      [o, {opt: opt, default: opt.default}]
+    end.to_h
+
     opts.each { |o,w|
+      # Mangling opts to OptionParser options in a graceful manner
+      # - opt_name: <scalar> becomes:
+      #   op.on("-o", "--opt-name", fixer[<scalar>.class], <scalar>.to_s) {...}
+      # - opt_name: <class> becomes: op.on("-o", "--opt-name", fixer[<class>]) {...}
+      #   where fixer is needed to map arbitrary classes into the class set
+      #   accepted by OptionParser
+      # This is actually the special case of the following general mechanism
+      # (through making an Opt instance <opt> from given <scalar>/<class>):
+      # - opt_name: <opt> becomes:
+      #   op.on("-"+<opt>.short, "--" + <opt>.name, <opt>.type,
+      #         <opt>.info % <opt>.default) {...}
+      opt = w[:opt]
+      if @shortopts.include? opt.short
+        opt.short_set? or opt.short = nil
+      else
+        @shortopts << opt.short
+      end
+      optargs = [
+        opt.short ? "-" + opt.short : nil,
+        ["--" + opt.name, opt.argument].compact.join("="),
+        opt.type,
+        opt.info % {default: opt.default_rep}
+      ].compact
+      @optionparser.on(*optargs) { |v| opts[o][:cmdline] = v }
+    }
+
+    @opts.merge! opts
+    nil
+  end
+
+  def parse argv
+    @optionparser.parse! argv
+  end
+
+  def conf conf_opt, keep_conf_opt: false
+    conf_resource = (@opts[conf_opt]||{}).values_at(
+       :cmdline, :default).compact.first
+    keep_conf_opt or @opts.delete(conf_opt)
+    if conf_resource
+       conf_load(conf_resource).each { |k,v|
+        (@opts[k.to_sym]||{})[:conf] = v
+      }
+    end
+    nil
+  end
+
+  def emit
+    opts = {}
+    @opts.each { |o,w|
       k = %i[cmdline conf default].find { |k| w.key? k }
       v = w[k]
       Class === v and missing(w[:opt].name)
       opts[o] = v
     }
-
     opts
+  end
+
+  def self.get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
+      optclass: Opt, help_args: nil
+    simpleopts = new(help_args: help_args)
+    [inopts].flatten.each { |oh| simpleopts.add_opts(oh, optclass: optclass) }
+    simpleopts.parse argv
+    conf_opt and simpleopts.conf(conf_opt, keep_conf_opt: keep_conf_opt)
+    simpleopts.emit
   end
 
   def missing optname
