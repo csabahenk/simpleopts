@@ -196,7 +196,7 @@ class SimpleOpts
       Class === v and missing(w[:opt].name)
       opts[o] = v
     }
-    opts
+    Struct.new(*opts.keys)[*opts.values]
   end
 
   def self.get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
