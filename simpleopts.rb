@@ -1,5 +1,4 @@
 require 'optparse'
-require 'ostruct'
 
 
 class SimpleOpts
@@ -197,7 +196,7 @@ class SimpleOpts
       Class === v and missing(w[:opt].name)
       opts[o] = v
     }
-    OpenStruct.new opts
+    opts
   end
 
   def self.get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
