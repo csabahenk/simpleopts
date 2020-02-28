@@ -199,7 +199,11 @@ class SimpleOpts
     Struct.new(*opts.keys)[*opts.values]
   end
 
-  def self.get inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
+  def self.get *a
+    self.get_args a
+  end
+
+  def self.get_args inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
       optclass: Opt, help_args: nil
     simpleopts = new(help_args: help_args)
     [inopts].flatten.each { |oh| simpleopts.add_opts(oh, optclass: optclass) }
