@@ -40,12 +40,14 @@ class SimpleOpts
     private :setup
 
     def initialize name: nil, type: nil, default: :auto, default_rep: nil,
-                   short: :auto, argument: :auto, info: "%{default}"
+                   short: :auto, argument: :auto, info: "%{default}",
+                   prelude: :auto
       @name = name
       @default = default
       @default_rep = default_rep
       @type = type
       @info = info
+      @prelude = prelude
       @short = short
       @argument = argument
       setup
@@ -56,6 +58,16 @@ class SimpleOpts
 
     def default
       @default == :auto ? type : @default
+    end
+
+    def prelude
+      @prelude == :auto ? (case @default
+        when Symbol,Class,nil
+          ""
+        else
+          "default: "
+        end
+      ) : @prelude
     end
 
     def argument
@@ -136,7 +148,7 @@ class SimpleOpts
       # (through making an Opt instance <opt> from given <scalar>/<class>):
       # - opt_name: <opt> becomes:
       #   op.on("-"+<opt>.short, "--" + <opt>.name, <opt>.type,
-      #         <opt>.info % <opt>.default) {...}
+      #         <opt>.prelude + <opt>.info % <opt>.default) {...}
       opt = w[:opt]
       if @shortopts.include? opt.short
         opt.short_set? or opt.short = nil
@@ -147,7 +159,7 @@ class SimpleOpts
         opt.short ? "-" + opt.short : nil,
         ["--" + opt.name, opt.argument].compact.join("="),
         opt.type,
-        opt.info % {default: opt.default_rep}
+        opt.prelude + opt.info % {default: opt.default_rep}
       ].compact
       @optionparser.on(*optargs) { |v| opts[o][:cmdline] = v }
     }
