@@ -32,11 +32,12 @@ class SimpleOpts
       end
     end
 
-    private def setup
+    def setup
       @type = self.class.classfixer(@type ||
                 (@default == :auto ? String : @default.class))
       @default_rep ||= self.class.represent(default)
     end
+    private :setup
 
     def initialize name: nil, type: nil, default: :auto, default_rep: nil,
                    short: :auto, argument: :auto, info: "%{default}"
@@ -109,7 +110,8 @@ class SimpleOpts
   end
 
   def add_opts inopts, optclass: Opt
-    opts = inopts.map do |o,d|
+    opts = inopts.each_with_object({}) do |x,ah|
+      o,d = x
       optname = o.to_s.gsub "_", "-"
       opt = case d
       when Opt,optclass
@@ -120,8 +122,8 @@ class SimpleOpts
       else
         optclass.new name: optname, default: d
       end
-      [o, {opt: opt, default: opt.default}]
-    end.to_h
+      ah[o] = {opt: opt, default: opt.default}
+    end
 
     opts.each { |o,w|
       # Mangling opts to OptionParser options in a graceful manner
@@ -154,7 +156,7 @@ class SimpleOpts
     nil
   end
 
-  private def supress_unshortopts
+  def supress_unshortopts
     unshortopts = @opts.map { |o,w| w[:opt].name[0] } - @shortopts
     unshortopts.each { |o|
       o == ?h and next
@@ -171,6 +173,7 @@ class SimpleOpts
       }
     end
   end
+  private :supress_unshortopts
 
   def parse argv
     @optionparser.parse! argv
