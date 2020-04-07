@@ -86,7 +86,7 @@ class SimpleOpts
       when 'Array'
         "VAL,.."
       when 'Regexp'
-        "PAT"
+        "REGEX"
       when 'Date','Time','DateTime'
         "T"
       else
