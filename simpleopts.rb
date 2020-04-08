@@ -187,8 +187,8 @@ class SimpleOpts
   end
   private :supress_unshortopts
 
-  def parse argv
-    @optionparser.parse! argv
+  def parse argv, order: false
+    @optionparser.send((order ? :order! : :parse!), argv)
   end
 
   def conf conf_opt, keep_conf_opt: false
@@ -214,8 +214,8 @@ class SimpleOpts
     Struct.new(*opts.keys)[*opts.values]
   end
 
-  def get_args argv: $*, conf_opt: nil, keep_conf_opt: false
-    parse argv
+  def get_args argv: $*, conf_opt: nil, keep_conf_opt: false, **kw
+    parse argv, **kw
     conf_opt and conf(conf_opt, keep_conf_opt: keep_conf_opt)
     emit
   end
