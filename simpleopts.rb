@@ -214,19 +214,36 @@ class SimpleOpts
     Struct.new(*opts.keys)[*opts.values]
   end
 
+  def get_args argv: $*, conf_opt: nil, keep_conf_opt: false
+    parse argv
+    conf_opt and conf(conf_opt, keep_conf_opt: keep_conf_opt)
+    emit
+  end
+
   def self.get *a
     self.get_args a
   end
 
-  def self.get_args inopts, argv: $*, conf_opt: nil, keep_conf_opt: false,
-      optclass: Opt
+  def self.build *inopts, optclass: Opt
     help_args_list,inopts = [inopts].flatten.partition { |e| String === e }
     simpleopts = new(help_args: help_args_list.empty? ? nil : help_args_list.join(" "))
     inopts.each { |oh| simpleopts.add_opts(oh, optclass: optclass) }
     simpleopts.send :supress_unshortopts
-    simpleopts.parse argv
-    conf_opt and simpleopts.conf(conf_opt, keep_conf_opt: keep_conf_opt)
-    simpleopts.emit
+    simpleopts
+  end
+
+  def self.get_args inopts, **kw
+    buildkw, get_argskw = {}, {}
+    kw.each do |k,v|
+      case k
+      when :optclass
+        buildkw
+      else
+        get_argskw
+      end[k] = v
+    end
+    simpleopts = self.build inopts, **buildkw
+    simpleopts.get_args **get_argskw
   end
 
   def missing optname
