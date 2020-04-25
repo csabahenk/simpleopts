@@ -232,7 +232,7 @@ class SimpleOpts
     simpleopts
   end
 
-  def self.get_args inopts, **kw
+  def self.get_args inopts, leftover_opts_key: nil, argv: $*, **kw
     buildkw, get_argskw = {}, {}
     kw.each do |k,v|
       case k
@@ -242,8 +242,28 @@ class SimpleOpts
         get_argskw
       end[k] = v
     end
-    simpleopts = self.build inopts, **buildkw
-    simpleopts.get_args **get_argskw
+    leftover_opts = []
+    sos = begin
+      simpleopts = self.build inopts, **buildkw
+      argv_saved = argv.dup if leftover_opts_key
+      simpleopts.get_args argv: argv, **get_argskw
+    rescue OptionParser::InvalidOption => x
+      # x fired because x.args[0] is an option unknown to
+      # the underlying OptionParser. On request (leftover_opts_key
+      # specified) we handle this.
+      raise unless leftover_opts_key
+      # Save the offending option to leftover_opts
+      leftover_opts.concat x.args
+      # Restore argv sans offender and retry
+      argv.prepend *argv_saved[0...-(argv.size+1)]
+      retry
+    end
+    if leftover_opts_key
+      soh = sos.to_h.merge leftover_opts_key=> leftover_opts
+      Struct.new(*soh.keys)[*soh.values]
+    else
+      sos
+     end
   end
 
   def missing optname
