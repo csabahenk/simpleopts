@@ -177,7 +177,9 @@ class SimpleOpts
         def summarize *x
         end
       end
-      @optionparser.top.append sw
+      # if sw is Switch< ... @short=["-i"] ...>, we have to pass
+      # ["i"] as second arg to #append to get it registered for 'i'
+      @optionparser.top.append sw, sw.short.map { |s| s[1] }, sw.long
     }
     if unshortopts.include? ?h
       @optionparser.instance_variable_get(:@stack).then {|s|
