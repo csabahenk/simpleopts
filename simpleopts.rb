@@ -161,7 +161,11 @@ class SimpleOpts
         opt.type,
         opt.prelude + opt.info % {default: opt.default_rep}
       ].compact
-      @optionparser.on(*optargs) { |v| opts[o][:cmdline] = v }
+      if opt.type <= Array
+        @optionparser.on(*optargs) { |v| (opts[o][:cmdline]||=[]).concat v }
+      else
+        @optionparser.on(*optargs) { |v| opts[o][:cmdline] = v }
+      end
     }
 
     @opts.merge! opts
