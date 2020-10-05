@@ -158,7 +158,8 @@ class SimpleOpts
       optargs = [
         opt.short ? "-" + opt.short : nil,
         ["--" + opt.name, opt.argument].compact.join("="),
-        opt.type,
+        # We omit String type as it has the effect of not accepting an emtpy string
+        opt.type == String ? nil : opt.type,
         opt.prelude + opt.info % {default: opt.default_rep}
       ].compact
       if opt.type <= Array
