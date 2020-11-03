@@ -1,4 +1,5 @@
 require 'optparse'
+require 'yaml'
 
 
 class SimpleOpts
@@ -199,11 +200,13 @@ class SimpleOpts
   end
 
   def conf conf_opt, keep_conf_opt: false
-    conf_resource = (@opts[conf_opt]||{}).values_at(
-       :cmdline, :default).compact.first
+    conf_type,conf_resource = %i[cmdline default].each_with_object(nil) { |k|
+      v = @opts[conf_opt][k]
+      v and break [k,v]
+    }
     keep_conf_opt or @opts.delete(conf_opt)
     if conf_resource
-       conf_load(conf_resource).each { |k,v|
+       conf_load(conf_resource, type: conf_type).each { |k,v|
         (@opts[k.to_sym]||{})[:conf] = v
       }
     end
@@ -278,7 +281,14 @@ class SimpleOpts
     exit 1
   end
 
-  def conf_load resource
+  def conf_load resource, type:
+    case type
+    when :cmdline
+    when :default
+      ! (File.file? resource and File.readable? resource) and return {}
+    else
+      raise ArgumentError, "unknown conf type #{type.inspect}"
+    end
     YAML.load_file resource
   end
 
