@@ -1,4 +1,5 @@
 require 'optparse'
+require 'set'
 require 'yaml'
 
 
@@ -42,7 +43,7 @@ class SimpleOpts
 
     def initialize name: nil, type: nil, default: :auto, default_rep: nil,
                    short: :auto, argument: :auto, info: "%{default}",
-                   prelude: :auto
+                   prelude: :auto, choices: nil
       @name = name
       @default = default
       @default_rep = default_rep
@@ -51,10 +52,11 @@ class SimpleOpts
       @prelude = prelude
       @short = short
       @argument = argument
+      @choices = choices
       setup
     end
 
-    attr_accessor :name, :type, :info, :default_rep
+    attr_accessor :name, :type, :info, :default_rep, :choices
     attr_writer :default, :short, :argument
 
     def default
@@ -73,6 +75,16 @@ class SimpleOpts
 
     def argument
       @argument == :auto or return @argument
+
+      case choices
+      when Set
+        return "{#{choices.join ?|}}"
+      when Hash
+        return "{#{choices.keys.join ?|}}"
+      when nil
+      else
+        raise TypeError, "choices is #{choices.class}"
+      end
 
       # Classes don't match themselves with === operator,
       # so the case construct has to dispatch on their names.
@@ -132,6 +144,10 @@ class SimpleOpts
         d
       when Class
         optclass.new name: optname, type: d
+      when Set
+        optclass.new name: optname, default: d.each.next.to_s, choices: d
+      when Hash
+        optclass.new name: optname, default: d.each_key.next.to_s, choices: d
       else
         optclass.new name: optname, default: d
       end
@@ -219,7 +235,23 @@ class SimpleOpts
       k = %i[cmdline conf default].find { |k| w.key? k }
       v = w[k]
       Class === v and missing(w[:opt].name)
-      opts[o] = v
+      choices = w[:opt].choices
+      choices &&= case choices
+      when Set
+        choices.map { |e| [e.to_s, e] }.to_h
+      when Hash
+        # .transform_keys &:to_s
+        choices.map { |k,v| [k.to_s, v] }.to_h
+      end
+      opts[o] = if choices
+        if choices.key? v
+          choices[v]
+        else
+          no_choice(w[:opt].name, v, choices.keys)
+        end
+      else
+        v
+      end
     }
     Struct.new(*opts.keys)[*opts.values]
   end
@@ -277,7 +309,12 @@ class SimpleOpts
   end
 
   def missing optname
-    puts "missing value for --#{optname}"
+    STDERR.puts "missing value for --#{optname}"
+    exit 1
+  end
+
+  def no_choice optname, value, choices
+    STDERR.puts "invalid choice #{value} for --#{optname} (should be one of #{choices.join ?,})"
     exit 1
   end
 
