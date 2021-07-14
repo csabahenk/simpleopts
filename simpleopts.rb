@@ -82,6 +82,8 @@ class SimpleOpts
       when Hash
         return "{#{choices.keys.join ?|}}"
       when nil
+      when Proc
+        return "VAL"
       else
         raise TypeError, "choices is #{choices.class}"
       end
@@ -147,7 +149,9 @@ class SimpleOpts
       when Set
         optclass.new name: optname, default: d.each.next.to_s, choices: d
       when Hash
-        optclass.new name: optname, default: d.each_key.next.to_s, choices: d
+        optclass.new name: optname, default: d.each_key.next.to_s, choices: d.compact
+      when Proc
+        optclass.new name: optname, choices: d
       else
         optclass.new name: optname, default: d
       end
@@ -236,19 +240,17 @@ class SimpleOpts
       v = w[k]
       Class === v and missing(w[:opt].name)
       choices = w[:opt].choices
-      choices &&= case choices
+      choices, choices_list = case choices
       when Set
-        choices.map { |e| [e.to_s, e] }.to_h
+        [choices.map { |e| [e.to_s, e] }.to_h, choices]
       when Hash
         # .transform_keys &:to_s
-        choices.map { |k,v| [k.to_s, v] }.to_h
+        [choices.map { |k,v| [k.to_s, v] }.to_h, choices.keys]
+      when Proc
+        choices
       end
       opts[o] = if choices
-        if choices.key? v
-          choices[v]
-        else
-          no_choice(w[:opt].name, v, choices.keys)
-        end
+        choices[v] || no_choice(w[:opt].name, v, choices_list)
       else
         v
       end
@@ -314,7 +316,8 @@ class SimpleOpts
   end
 
   def no_choice optname, value, choices
-    STDERR.puts "invalid choice #{value} for --#{optname} (should be one of #{choices.join ?,})"
+    STDERR.puts ["invalid choice #{value} for --#{optname}",
+                 choices && "(should be one of #{choices.join ?,})"].compact.join(" ")
     exit 1
   end
 
